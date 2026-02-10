@@ -11,6 +11,7 @@ import { LanguageToggle } from '@/components/LanguageToggle';
 import { useLanguage } from '@/components/LanguageProvider';
 import { NewsItem } from '@/lib/types';
 import { newsApi, userApi } from '@/lib/api';
+import LatestReport from '@/components/LatestReport';
 
 export default function Dashboard() {
     const { t, language } = useLanguage();
@@ -177,6 +178,8 @@ export default function Dashboard() {
 
                         {/* News Feed Header */}
                         <div className="flex items-center justify-between mb-12 animate-fadeIn">
+                            <LatestReport />
+
                             <h2 className="text-4xl font-black tracking-tighter flex items-center gap-4">
                                 <span className="w-3 h-12 bg-gradient-to-b from-blue-500 via-purple-500 to-pink-500 rounded-full" />
                                 <span className="text-gemini">{t.dashboard?.title || 'Daily AI Digest'}</span>

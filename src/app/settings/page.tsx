@@ -8,7 +8,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { useLanguage } from '@/components/LanguageProvider';
 import { useAuth } from '@/components/AuthProvider';
-import { userApi } from '@/lib/api';
+import { userApi, authApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 
 export default function Settings() {
@@ -217,6 +217,52 @@ export default function Settings() {
                                 onChange={(e) => setNotificationTime(Number(e.target.value))}
                                 className="w-full h-4 bg-muted rounded-full appearance-none cursor-pointer accent-blue-600"
                             />
+                        </div>
+                    </section>
+
+                    {/* Change Password */}
+                    <section className="glass-card rounded-[2.5rem] p-12 animate-fadeIn delay-400">
+                        <div className="flex items-center gap-4 mb-10">
+                            <div className="w-14 h-14 bg-red-500/10 rounded-2xl flex items-center justify-center text-red-500 border border-red-500/20">
+                                <LogOut className="w-7 h-7" />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-black tracking-tight text-red-500">Security</h2>
+                                <p className="text-muted-foreground text-sm font-bold">Manage your account credentials</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            <input
+                                type="password"
+                                placeholder="Current Password"
+                                className="w-full px-8 py-5 glass border border-border rounded-2xl font-bold"
+                                id="current-password"
+                            />
+                            <input
+                                type="password"
+                                placeholder="New Password"
+                                className="w-full px-8 py-5 glass border border-border rounded-2xl font-bold"
+                                id="new-password"
+                            />
+                            <button
+                                onClick={async () => {
+                                    const currentPassword = (document.getElementById('current-password') as HTMLInputElement).value;
+                                    const newPassword = (document.getElementById('new-password') as HTMLInputElement).value;
+                                    if (!currentPassword || !newPassword) return toast.error('Both fields are required');
+                                    try {
+                                        await authApi.changePassword({ currentPassword, newPassword });
+                                        toast.success('Password updated successfully!');
+                                        (document.getElementById('current-password') as HTMLInputElement).value = '';
+                                        (document.getElementById('new-password') as HTMLInputElement).value = '';
+                                    } catch (err: any) {
+                                        toast.error(err.message || 'Failed to update password');
+                                    }
+                                }}
+                                className="w-full py-5 bg-red-500/10 text-red-500 font-black rounded-2xl hover:bg-red-500/20 border border-red-500/20 transition-all"
+                            >
+                                Update Password
+                            </button>
                         </div>
                     </section>
 

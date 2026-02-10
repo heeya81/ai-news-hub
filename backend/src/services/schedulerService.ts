@@ -3,13 +3,24 @@ import prisma from '../lib/prisma.js';
 import { fetchAINews, getRecentNews, filterNewsByKeywords } from './newsService.js';
 import { analyzeNewsRelevance } from './aiService.js';
 import { sendPushNotification } from './notificationService.js';
+import { generateDailyReports } from './reportService.js';
 
 export function initScheduler() {
-    // Run every hour at minute 0
+    // 1. Hourly news check & push notifications
+    // Run at minute 0 of every hour
     cron.schedule('0 * * * *', async () => {
-        console.log('⏰ Running Scheduled Notification Task:', new Date().toLocaleString());
+        console.log('⏰ Running Hourly Notification Task:', new Date().toLocaleString());
         await processNotifications();
     });
+
+    // 2. Daily AI Report generation
+    // Run at 05:00 AM every day
+    cron.schedule('0 5 * * *', async () => {
+        console.log('🌅 Running Daily AI Report Generation:', new Date().toLocaleString());
+        await generateDailyReports();
+    });
+
+    console.log('🚀 Scheduler initialized (Hourly Notifications + Daily AI Reports)');
 }
 
 async function processNotifications() {
@@ -35,24 +46,20 @@ async function processNotifications() {
 
         console.log(`Processing notifications for ${usersToNotify.length} users...`);
 
-        // To optimize, we could fetch news once per unique set of sources, 
-        // but for now, we'll process each user (or group them).
-
         for (const user of usersToNotify) {
             if (!user.profile) continue;
 
-            const keywords = user.profile.keywords ? (user.profile.keywords as string[]) : [];
-            const sources = user.profile.sources ? (user.profile.sources as any[]) : null;
+            const keywords = user.profile.keywords ? (JSON.parse(user.profile.keywords as string)) : [];
+            const sources = user.profile.sources ? (JSON.parse(user.profile.sources as string)) : null;
 
             // Fetch and filter news
-            // We use a 24-hour window for the daily digest
             const rawNews = await fetchAINews(sources || undefined);
-            const recentNews = getRecentNews(rawNews, 24);
+            const recentNews = getRecentNews(rawNews, 24); // 24-hour window
 
-            let filteredNews = filteredNewsByKeywords(recentNews, keywords);
+            let filteredNews = filterNewsByKeywords(recentNews, keywords);
 
             if (keywords.length > 0 && filteredNews.length > 0) {
-                // Optional: AI Analysis for the top candidates
+                // AI Analysis for the top candidates
                 try {
                     const aiResults = await analyzeNewsRelevance(
                         filteredNews.slice(0, 5).map(i => ({ title: i.title, content: i.content })),
@@ -71,7 +78,6 @@ async function processNotifications() {
                                     '/dashboard'
                                 );
 
-                                // Update lastNotifiedAt
                                 await prisma.profile.update({
                                     where: { userId: user.id },
                                     data: { lastNotifiedAt: new Date() }
@@ -85,7 +91,7 @@ async function processNotifications() {
                 }
             }
 
-            // Fallback: If no AI match or AI failed, send the top recent news
+            // Fallback
             if (filteredNews.length > 0) {
                 const item = filteredNews[0];
                 await sendPushNotification(
@@ -105,15 +111,4 @@ async function processNotifications() {
     } catch (error) {
         console.error('Scheduler Error:', error);
     }
-}
-
-// Typo fix helper from current newsService
-function filteredNewsByKeywords(news: any[], keywords: string[]) {
-    if (!keywords || keywords.length === 0) return news.slice(0, 5);
-    return news.filter(item =>
-        keywords.some(k =>
-            item.title.toLowerCase().includes(k.toLowerCase()) ||
-            item.content.toLowerCase().includes(k.toLowerCase())
-        )
-    );
 }

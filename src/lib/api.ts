@@ -1,51 +1,44 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export async function apiRequest(endpoint: string, options: RequestInit = {}) {
-    let token = typeof window !== 'undefined' ? localStorage.getItem('ainews_token') : null;
-
     const headers: any = {
         'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         ...options.headers,
     };
 
+    // With cookie-based auth, we don't need to manually add the Authorization header
+    // but we MUST include credentials: 'include'
     let response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
         headers,
+        credentials: 'include',
     });
 
     // Handle Token Refresh (401 Unauthorized)
     if (response.status === 401 && endpoint !== '/auth/login' && endpoint !== '/auth/refresh') {
-        const refreshToken = localStorage.getItem('ainews_refresh_token');
-        if (refreshToken) {
-            try {
-                const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ refreshToken }),
+        try {
+            const refreshRes = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+            });
+
+            if (refreshRes.ok) {
+                // Retry original request
+                response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                    ...options,
+                    headers,
+                    credentials: 'include',
                 });
-
-                if (refreshRes.ok) {
-                    const refreshData = await refreshRes.json();
-                    localStorage.setItem('ainews_token', refreshData.accessToken);
-
-                    // Retry original request
-                    token = refreshData.accessToken;
-                    headers['Authorization'] = `Bearer ${token}`;
-                    response = await fetch(`${API_BASE_URL}${endpoint}`, {
-                        ...options,
-                        headers,
-                    });
-                } else {
-                    // Refresh token failed
-                    localStorage.removeItem('ainews_token');
-                    localStorage.removeItem('ainews_refresh_token');
-                    localStorage.removeItem('ainews_user');
-                    if (typeof window !== 'undefined') window.location.href = '/auth';
+            } else {
+                // Refresh token failed
+                localStorage.removeItem('ainews_user');
+                if (typeof window !== 'undefined' && window.location.pathname !== '/auth') {
+                    window.location.href = '/auth';
                 }
-            } catch (err) {
-                console.error('Refresh Token Error:', err);
             }
+        } catch (err) {
+            console.error('Refresh Token Error:', err);
         }
     }
 
@@ -67,13 +60,13 @@ export const authApi = {
         method: 'POST',
         body: JSON.stringify(userData),
     }),
-    logout: () => {
-        const refreshToken = localStorage.getItem('ainews_refresh_token');
-        return apiRequest('/auth/logout', {
-            method: 'POST',
-            body: JSON.stringify({ refreshToken }),
-        });
-    }
+    logout: () => apiRequest('/user/logout', {
+        method: 'POST',
+    }),
+    changePassword: (passwords: any) => apiRequest('/user/change-password', {
+        method: 'POST',
+        body: JSON.stringify(passwords),
+    })
 };
 
 export const userApi = {
@@ -86,6 +79,8 @@ export const userApi = {
         method: 'POST',
         body: JSON.stringify({ subscription }),
     }),
+    getReports: () => apiRequest('/user/reports'),
+    getLatestReport: () => apiRequest('/user/reports/latest'),
 };
 
 export const newsApi = {

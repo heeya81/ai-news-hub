@@ -26,7 +26,7 @@ export default function AuthPage() {
         try {
             if (isLogin) {
                 const data = await authApi.login({ email, password });
-                authLogin(data.accessToken, data.refreshToken, data.user);
+                authLogin(data.user);
                 toast.success(t.common?.loginSuccess || 'Logged in successfully!');
             } else {
                 await authApi.register({ email, password });

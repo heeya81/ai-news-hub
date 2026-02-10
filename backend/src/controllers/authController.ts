@@ -6,6 +6,18 @@ import prisma from '../lib/prisma.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'your-refresh-secret-key';
 
+const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+};
+
+const accessTokenOptions = {
+    ...cookieOptions,
+    maxAge: 15 * 60 * 1000 // 15 mins
+};
+
 export const register = async (req: Request, res: Response) => {
     try {
         const { email, password } = req.body;
@@ -68,10 +80,12 @@ export const login = async (req: Request, res: Response) => {
             }
         });
 
+        // Set Cookies
+        res.cookie('accessToken', accessToken, accessTokenOptions);
+        res.cookie('refreshToken', refreshToken, cookieOptions);
+
         res.json({
             success: true,
-            accessToken,
-            refreshToken,
             user: { id: user.id, email: user.email }
         });
     } catch (error) {
@@ -82,8 +96,8 @@ export const login = async (req: Request, res: Response) => {
 
 export const refresh = async (req: Request, res: Response) => {
     try {
-        const { refreshToken } = req.body;
-        if (!refreshToken) return res.status(400).json({ success: false, error: 'Refresh token required' });
+        const refreshToken = req.cookies.refreshToken;
+        if (!refreshToken) return res.status(401).json({ success: false, error: 'Refresh token required' });
 
         const savedToken = await prisma.refreshToken.findUnique({
             where: { token: refreshToken }
@@ -91,6 +105,8 @@ export const refresh = async (req: Request, res: Response) => {
 
         if (!savedToken || savedToken.expiresAt < new Date()) {
             if (savedToken) await prisma.refreshToken.delete({ where: { id: savedToken.id } });
+            res.clearCookie('accessToken');
+            res.clearCookie('refreshToken');
             return res.status(401).json({ success: false, error: 'Invalid or expired refresh token' });
         }
 
@@ -98,9 +114,12 @@ export const refresh = async (req: Request, res: Response) => {
             const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET) as any;
             const newAccessToken = jwt.sign({ userId: decoded.userId }, JWT_SECRET, { expiresIn: '15m' });
 
-            res.json({ success: true, accessToken: newAccessToken });
+            res.cookie('accessToken', newAccessToken, accessTokenOptions);
+            res.json({ success: true });
         } catch (err) {
             await prisma.refreshToken.delete({ where: { id: savedToken.id } });
+            res.clearCookie('accessToken');
+            res.clearCookie('refreshToken');
             return res.status(401).json({ success: false, error: 'Invalid refresh token' });
         }
     } catch (error) {
@@ -111,12 +130,43 @@ export const refresh = async (req: Request, res: Response) => {
 
 export const logout = async (req: Request, res: Response) => {
     try {
-        const { refreshToken } = req.body;
+        const refreshToken = req.cookies.refreshToken;
         if (refreshToken) {
             await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
         }
+        res.clearCookie('accessToken');
+        res.clearCookie('refreshToken');
         res.json({ success: true, message: 'Logged out successfully' });
     } catch (error) {
+        res.status(500).json({ success: false, error: 'Internal Server Error' });
+    }
+};
+
+export const changePassword = async (req: any, res: Response) => {
+    try {
+        const userId = req.userId;
+        const { currentPassword, newPassword } = req.body;
+
+        if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) return res.status(400).json({ success: false, error: 'Incorrect current password' });
+
+        const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+        await prisma.user.update({
+            where: { id: userId },
+            data: { password: hashedNewPassword }
+        });
+
+        // Optional: Logout other sessions by clearing all refresh tokens
+        await (prisma as any).refreshToken.deleteMany({ where: { userId } });
+
+        res.json({ success: true, message: 'Password updated successfully' });
+    } catch (error) {
+        console.error('Change Password Error:', error);
         res.status(500).json({ success: false, error: 'Internal Server Error' });
     }
 };

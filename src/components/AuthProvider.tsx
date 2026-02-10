@@ -11,7 +11,7 @@ type User = {
 type AuthContextType = {
     user: User | null;
     loading: boolean;
-    login: (accessToken: string, refreshToken: string, user: User) => void;
+    login: (user: User) => void;
     logout: () => void;
 };
 
@@ -24,10 +24,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
 
     useEffect(() => {
-        const token = localStorage.getItem('ainews_token');
         const savedUser = localStorage.getItem('ainews_user');
 
-        if (token && savedUser) {
+        if (savedUser) {
             setUser(JSON.parse(savedUser));
         } else if (!['/', '/auth'].includes(pathname)) {
             router.push('/auth');
@@ -36,17 +35,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
     }, [pathname, router]);
 
-    const login = (accessToken: string, refreshToken: string, userData: User) => {
-        localStorage.setItem('ainews_token', accessToken);
-        localStorage.setItem('ainews_refresh_token', refreshToken);
+    const login = (userData: User) => {
         localStorage.setItem('ainews_user', JSON.stringify(userData));
         setUser(userData);
         router.push('/dashboard');
     };
 
     const logout = () => {
-        localStorage.removeItem('ainews_token');
-        localStorage.removeItem('ainews_refresh_token');
         localStorage.removeItem('ainews_user');
         setUser(null);
         router.push('/');

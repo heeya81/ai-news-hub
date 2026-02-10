@@ -13,6 +13,7 @@ model User {
   profile       Profile?
   subscriptions Subscription[]
   refreshTokens RefreshToken[]
+  dailyReports  DailyReport[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -44,5 +45,15 @@ model RefreshToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
   expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model DailyReport {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  title     String
+  content   String   @db.LongText
+  date      DateTime @default(now())
   createdAt DateTime @default(now())
 }
