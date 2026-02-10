@@ -24,35 +24,34 @@ AI News Hub is a premium, Gemini-inspired news curation engine designed to keep 
 -   **RSS Parsing**: `rss-parser`
 -   **Date Handling**: `date-fns`
 
-## 🛠️ Installation & Setup
+## 🚀 Getting Started
 
-1.  **Clone the repository**:
-    ```bash
-    git clone https://github.com/heeya81/ai-news-hub.git
-    cd ai-news-hub
-    ```
+### 1. Backend Setup (Node.js)
+```bash
+cd backend
+npm install
+npm run dev   # Runs on http://localhost:5000
+```
 
-2.  **Install dependencies**:
-    ```bash
-    npm install
-    ```
-
-3.  **Run locally**:
-    ```bash
-    npm run dev
-    ```
-
-4.  **Open in browser**:
-    Navigate to `http://localhost:3000`
+### 2. Frontend Setup (Next.js)
+In the root directory:
+```bash
+npm install
+npm run dev   # Runs on http://localhost:3000
+```
 
 ## 📂 Project Structure
 
 ```text
-src/
-├── app/             # Next.js App Router (Pages & APIs)
-├── components/      # Reusable UI Components (Providers, Controls)
-├── lib/             # Core Logic (News Fetcher, Translations, Utils)
-└── styles/          # Global CSS and Theme configurations
+├── frontend/ (Root) # Next.js UI
+│   ├── src/app/
+│   ├── src/components/
+│   └── .env.local   # Points to NEXT_PUBLIC_API_URL
+└── backend/         # Node.js API Service
+    ├── src/
+    │   ├── services/
+    │   └── server.ts
+    └── .env         # Port and environment configs
 ```
 
 ## 📝 Configuration

@@ -3,23 +3,26 @@
 import { useEffect, useState } from 'react';
 import { Rss, Plus, Settings as SettingsIcon, ChevronRight, Home, Bell, Menu, Sparkles, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
-import { filterNewsByKeywords, getRecentNews, type NewsItem } from '@/lib/news';
 import { formatDistanceToNow } from 'date-fns';
 import { ko, enUS } from 'date-fns/locale';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { useLanguage } from '@/components/LanguageProvider';
+import { NewsItem } from '@/lib/types';
 
 export default function Dashboard() {
     const { t, language } = useLanguage();
     const dateLocale = language === 'ko' ? ko : enUS;
 
     const [news, setNews] = useState<NewsItem[]>([]);
-    const [filteredNews, setFilteredNews] = useState<NewsItem[]>([]);
     const [keywords, setKeywords] = useState<string[]>([]);
+    const [totalFetchedCount, setTotalFetchedCount] = useState(0);
+    const [activeSources, setActiveSources] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
+
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
     useEffect(() => {
         // Load keywords from localStorage
@@ -33,25 +36,17 @@ export default function Dashboard() {
                 }
             }
         }
-
-        // Load news
-        loadNews();
     }, []);
 
     useEffect(() => {
-        // Filter news when keywords change
-        if (keywords.length > 0) {
-            setFilteredNews(filterNewsByKeywords(news, keywords));
-        } else {
-            setFilteredNews(news);
-        }
-    }, [keywords, news]);
+        loadNews();
+    }, [keywords]);
 
     async function loadNews() {
         setLoading(true);
         try {
             // Check for custom sources
-            let customSources = null;
+            let customSources = [];
             if (typeof window !== 'undefined') {
                 const savedSources = localStorage.getItem('ainews_sources');
                 if (savedSources) {
@@ -63,48 +58,32 @@ export default function Dashboard() {
                 }
             }
 
-            let response;
-            if (customSources && customSources.length > 0) {
-                response = await fetch('/api/news', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sources: customSources }),
-                });
-            } else {
-                response = await fetch('/api/news');
-            }
+            // Call Backend API via POST
+            const response = await fetch(`${API_URL}/api/news`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sources: customSources.length > 0 ? customSources : null,
+                    keywords: keywords
+                }),
+            });
 
             const data = await response.json();
 
             if (data.success && data.news) {
-                const allNews = data.news;
-                const recentNews = getRecentNews(allNews, 48);
-                setNews(recentNews); // 상태 업데이트 (비동기)
-
-                // 2. localStorage에서 키워드 읽어 즉시 필터링 적용 (깜빡임 방지)
-                const savedKeywords = localStorage.getItem('ainews_keywords');
-                let currentKeywords: string[] = [];
-                if (savedKeywords) {
-                    try {
-                        currentKeywords = JSON.parse(savedKeywords);
-                    } catch (e) {
-                        // ignore
-                    }
-                }
-
-                if (currentKeywords.length > 0) {
-                    setFilteredNews(filterNewsByKeywords(recentNews, currentKeywords));
-                } else {
-                    setFilteredNews(recentNews);
-                }
+                setNews(data.news);
+                setTotalFetchedCount(data.totalFetched || data.news.length);
+                setActiveSources(data.sourcesFetched || []);
             } else {
                 setNews([]);
-                setFilteredNews([]);
+                setTotalFetchedCount(0);
+                setActiveSources([]);
             }
         } catch (error) {
-            console.error('Failed to load news:', error);
+            console.error('Failed to load news from backend:', error);
             setNews([]);
-            setFilteredNews([]);
+            setTotalFetchedCount(0);
+            setActiveSources([]);
         } finally {
             setLoading(false);
             setIsRefreshing(false);
@@ -116,12 +95,6 @@ export default function Dashboard() {
         loadNews();
     };
 
-    // Count by source (calculate from all fetched news to show total active channels)
-    const newsBySource = news.reduce((acc, item) => {
-        acc[item.source] = (acc[item.source] || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
-
     return (
         <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans transition-colors duration-500">
             {/* Sidebar */}
@@ -130,7 +103,7 @@ export default function Dashboard() {
                     <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
                         <Rss className="w-6 h-6 text-white" />
                     </div>
-                    <h1 className="text-xl font-black tracking-tight text-foreground/90 uppercase">
+                    <h1 className="text-xl font-bold tracking-tight text-foreground/90 uppercase">
                         Scrap Feed
                     </h1>
                 </div>
@@ -174,12 +147,12 @@ export default function Dashboard() {
                         <div className="flex items-center gap-10 text-sm">
                             <div className="flex flex-col">
                                 <span className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mb-1">{t.dashboard.sourceChannels}</span>
-                                <strong className="text-foreground text-xl font-black">{Object.keys(newsBySource).length}</strong>
+                                <strong className="text-foreground text-xl font-black">{activeSources.length}</strong>
                             </div>
                             <div className="w-[1px] h-10 bg-border/50" />
                             <div className="flex flex-col">
                                 <span className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mb-1">{t.dashboard.tailoredNews}</span>
-                                <strong className="text-primary text-xl font-black">{filteredNews.length}</strong>
+                                <strong className="text-primary text-xl font-black">{news.length}</strong>
                             </div>
                         </div>
                     </div>
@@ -226,23 +199,23 @@ export default function Dashboard() {
                                     <div key={i} className="glass-card rounded-[2.5rem] h-80 animate-pulse bg-muted/50" />
                                 ))}
                             </div>
-                        ) : filteredNews.length === 0 ? (
+                        ) : news.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-40 rounded-[3rem] border-2 border-dashed border-border/50 bg-card/30 animat-fadeIn">
                                 <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-10 shadow-inner">
                                     <Sparkles className="w-10 h-10 text-primary opacity-60" />
                                 </div>
                                 <h3 className="text-3xl font-black mb-4 tracking-tight">
-                                    {news.length > 0 ? t.dashboard.noMatchesTitle : t.dashboard.noNewsTitle}
+                                    {totalFetchedCount > 0 ? t.dashboard.noMatchesTitle : t.dashboard.noNewsTitle}
                                 </h3>
                                 <p className="text-muted-foreground text-lg mb-12 max-w-sm text-center font-bold leading-relaxed">
-                                    {news.length > 0
+                                    {totalFetchedCount > 0
                                         ? t.dashboard.noMatchesDesc
                                         : t.dashboard.noNewsDesc}
                                 </p>
-                                {news.length > 0 && (
+                                {totalFetchedCount > 0 && (
                                     <div className="flex items-center gap-6">
                                         <button
-                                            onClick={() => setFilteredNews(news)}
+                                            onClick={() => setKeywords([])}
                                             className="px-8 py-4 glass border border-border/50 hover:bg-background rounded-2xl text-md font-black transition-all active:scale-95"
                                         >
                                             {t.dashboard.showAllNews}
@@ -255,7 +228,7 @@ export default function Dashboard() {
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                                {filteredNews.map((item, index) => (
+                                {news.map((item, index) => (
                                     <div className={`animate-fadeIn delay-${(index % 6) * 100}`} key={`${item.link}-${index}`}>
                                         <NewsCard item={item} locale={dateLocale} badgeText={t.dashboard.newBadge} readMoreText={t.dashboard.readStory} />
                                     </div>
@@ -297,6 +270,23 @@ function NewsCard({ item, locale, badgeText, readMoreText }: { item: NewsItem, l
                     </span>
                 )}
             </div>
+
+            {/* AI Insights (If available) */}
+            {item.relevanceScore !== undefined && (
+                <div className="mb-6 px-4 py-3 bg-primary/5 border border-primary/20 rounded-2xl flex items-start gap-3">
+                    <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    <div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-black uppercase text-primary tracking-wider">Gemini Relevance: {item.relevanceScore}%</span>
+                        </div>
+                        {item.aiReason && (
+                            <p className="text-xs text-muted-foreground font-bold leading-snug italic line-clamp-2">
+                                "{item.aiReason}"
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Content */}
             <div className="mb-10 flex-1 flex flex-col">
