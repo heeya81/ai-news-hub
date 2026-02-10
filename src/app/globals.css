@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: rgb(var(--background));
+  --color-foreground: rgb(var(--foreground));
+  --color-card: rgb(var(--card));
+  --color-card-foreground: rgb(var(--card-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: rgb(var(--primary-foreground));
+  --color-secondary: rgb(var(--secondary));
+  --color-muted: rgb(var(--muted));
+  --color-muted-foreground: rgb(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-border: rgb(var(--border));
+  --color-input: rgb(var(--input));
+}
+
+@layer base {
+  :root {
+    /* Light Theme - Optimized for Contrast */
+    --background: 255 255 255;
+    --foreground: 18 20 28;
+    --card: 255 255 255;
+    --card-foreground: 18 20 28;
+    --primary: 221 83% 48%;
+    /* Slightly darker blue for white text readability */
+    --primary-foreground: 255 255 255;
+    --secondary: 240 10% 96%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 100 110 130;
+    --accent: 260 90% 66%;
+    --border: 220 13% 88%;
+    --input: 220 13% 88%;
+    --radius: 1.25rem;
+
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(0, 0, 0, 0.06);
+    --gemini-gradient: linear-gradient(135deg, #4285F4 0%, #9b72f3 50%, #d946ef 100%);
+  }
+
+  .dark {
+    /* Dark Theme - Deep Space */
+    --background: 13 15 22;
+    --foreground: 240 240 250;
+    --card: 21 23 32;
+    --card-foreground: 240 240 250;
+    --primary: 217 91% 65%;
+    --primary-foreground: 255 255 255;
+    --secondary: 30 35 45;
+    --muted: 30 35 45;
+    --muted-foreground: 160 170 190;
+    --accent: 262 83% 58%;
+    --border: 224 20% 18%;
+    --input: 224 20% 18%;
+
+    --glass-bg: rgba(18, 22, 38, 0.65);
+    --glass-border: rgba(255, 255, 255, 0.08);
+  }
+}
+
+@layer base {
+  body {
+    background-color: rgb(var(--background));
+    color: rgb(var(--foreground));
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+}
+
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--glass-border);
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(66, 133, 244, 0.4);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.15);
+}
+
+.text-gemini {
+  background: var(--gemini-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ethereal-blob {
+  position: absolute;
+  filter: blur(100px);
+  z-index: -1;
+  opacity: 0.1;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.dark .ethereal-blob {
+  opacity: 0.15;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.03em;
+  font-weight: 800;
+}
+
+.glow-primary {
+  box-shadow: 0 10px 20px -5px rgba(66, 133, 244, 0.3);
+}
+
+.glow-primary:hover {
+  box-shadow: 0 15px 30px -5px rgba(66, 133, 244, 0.45);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.2);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(66, 133, 244, 0.3);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.delay-100 {
+  animation-delay: 100ms;
+}
+
+.delay-200 {
+  animation-delay: 200ms;
+}
+
+.delay-300 {
+  animation-delay: 300ms;
+}
+
+.delay-400 {
+  animation-delay: 400ms;
+}
+
+.delay-500 {
+  animation-delay: 500ms;
+}
