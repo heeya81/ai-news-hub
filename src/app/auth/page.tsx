@@ -7,33 +7,34 @@ import Link from 'next/link';
 import { authApi } from '@/lib/api';
 import { useLanguage } from '@/components/LanguageProvider';
 
+import toast from 'react-hot-toast';
+import { useAuth } from '@/components/AuthProvider';
+
 export default function AuthPage() {
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
     const router = useRouter();
+    const { login: authLogin } = useAuth();
     const { t } = useLanguage();
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setLoading(true);
-        setError('');
 
         try {
             if (isLogin) {
                 const data = await authApi.login({ email, password });
-                localStorage.setItem('ainews_token', data.token);
-                localStorage.setItem('ainews_user', JSON.stringify(data.user));
-                router.push('/dashboard');
+                authLogin(data.accessToken, data.refreshToken, data.user);
+                toast.success(t.common?.loginSuccess || 'Logged in successfully!');
             } else {
                 await authApi.register({ email, password });
+                toast.success(t.common?.registerSuccess || 'Registration successful! Please login.');
                 setIsLogin(true);
-                alert(t.common?.success || 'Registration successful! Please login.');
             }
         } catch (err: any) {
-            setError(err.message || 'Authentication failed');
+            toast.error(err.message || 'Authentication failed');
         } finally {
             setLoading(false);
         }
@@ -62,11 +63,6 @@ export default function AuthPage() {
                 </div>
 
                 <div className="glass-card p-10 rounded-[2.5rem] border border-border/30">
-                    {error && (
-                        <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-2xl text-destructive text-sm font-bold text-center">
-                            {error}
-                        </div>
-                    )}
 
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">

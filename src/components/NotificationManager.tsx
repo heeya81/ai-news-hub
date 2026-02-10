@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bell, Check } from 'lucide-react';
+import { Bell, Check, BellOff, Settings, X, Info } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { userApi } from '@/lib/api';
 
 export default function NotificationManager() {
@@ -32,7 +33,7 @@ export default function NotificationManager() {
 
     async function requestPermission() {
         if (!('Notification' in window)) {
-            alert('This browser does not support notifications.');
+            toast.error('This browser does not support notifications.');
             return;
         }
 
@@ -47,7 +48,7 @@ export default function NotificationManager() {
             }
         } catch (error) {
             console.error('Failed to request permission:', error);
-            alert('Failed to request notification permission.');
+            toast.error('Failed to request notification permission.');
         } finally {
             setLoading(false);
         }
@@ -55,7 +56,7 @@ export default function NotificationManager() {
 
     async function subscribeToNotifications() {
         if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-            alert('This browser does not support push notifications.');
+            toast.error('This browser does not support push notifications.');
             return;
         }
 
@@ -87,9 +88,10 @@ export default function NotificationManager() {
             });
 
             setSubscribed(true);
+            toast.success('Notifications enabled successfully!');
         } catch (error) {
             console.error('Failed to subscribe to notifications:', error);
-            alert('Failed to subscribe to notifications.');
+            toast.error('Failed to subscribe to notifications.');
         }
     }
 
