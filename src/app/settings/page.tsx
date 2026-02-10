@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { useLanguage } from '@/components/LanguageProvider';
+import { userApi } from '@/lib/api';
 
 export default function Settings() {
     const { t } = useLanguage();
@@ -18,43 +19,37 @@ export default function Settings() {
     const [newSourceUrl, setNewSourceUrl] = useState('');
     const [notificationTime, setNotificationTime] = useState(9);
     const [saving, setSaving] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        const token = localStorage.getItem('ainews_token');
+        if (!token) {
+            router.push('/auth');
+            return;
+        }
         loadSettings();
     }, []);
 
-    function loadSettings() {
-        if (typeof window !== 'undefined') {
+    async function loadSettings() {
+        try {
+            const data = await userApi.getProfile();
+            if (data.success && data.profile) {
+                setKeywords(data.profile.keywords || []);
+                setSources(data.profile.sources || []);
+                setNotificationTime(data.profile.notificationTime || 9);
+            }
+        } catch (error) {
+            console.error('Failed to load settings from API, falling back to local:', error);
+            // Fallback to local storage if API fails or for offline support
             const savedKeywords = localStorage.getItem('ainews_keywords');
             const savedTime = localStorage.getItem('ainews_notification_time');
             const savedSources = localStorage.getItem('ainews_sources');
 
-            if (savedKeywords) {
-                try {
-                    setKeywords(JSON.parse(savedKeywords));
-                } catch (e) {
-                    setKeywords([]);
-                }
-            }
-
-            if (savedSources) {
-                try {
-                    setSources(JSON.parse(savedSources));
-                } catch (e) {
-                    setSources([]);
-                }
-            } else {
-                setSources([
-                    { name: 'AI Trends', url: 'https://www.aitrends.com/feed/' },
-                    { name: 'OpenAI Blog', url: 'https://openai.com/news/rss.xml' },
-                    { name: 'ZDNet Korea', url: 'https://feeds.feedburner.com/zdkorea' },
-                    { name: 'Google News (AI)', url: 'https://news.google.com/rss/search?q=AI+Artificial+Intelligence&hl=ko&gl=KR&ceid=KR:ko' },
-                ]);
-            }
-
-            if (savedTime) {
-                setNotificationTime(parseInt(savedTime) || 9);
-            }
+            if (savedKeywords) setKeywords(JSON.parse(savedKeywords));
+            if (savedSources) setSources(JSON.parse(savedSources));
+            if (savedTime) setNotificationTime(parseInt(savedTime) || 9);
+        } finally {
+            setLoading(false);
         }
     }
 
@@ -85,20 +80,34 @@ export default function Settings() {
         setSaving(true);
 
         try {
-            if (typeof window !== 'undefined') {
-                localStorage.setItem('ainews_keywords', JSON.stringify(keywords));
-                localStorage.setItem('ainews_notification_time', notificationTime.toString());
-                localStorage.setItem('ainews_sources', JSON.stringify(sources));
-            }
+            // Save to Backend
+            await userApi.updateProfile({
+                keywords,
+                sources,
+                notificationTime
+            });
 
-            alert(t.settings.saved);
+            // Local fallback backup
+            localStorage.setItem('ainews_keywords', JSON.stringify(keywords));
+            localStorage.setItem('ainews_notification_time', notificationTime.toString());
+            localStorage.setItem('ainews_sources', JSON.stringify(sources));
+
+            alert(t.settings?.saved || 'Settings saved successfully!');
             router.push('/dashboard');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to save settings:', error);
-            alert(t.settings.saveFailed);
+            alert((t.settings?.saveFailed || 'Failed to save settings: ') + (error.message || ''));
         } finally {
             setSaving(false);
         }
+    }
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
     }
 
     return (
@@ -131,9 +140,9 @@ export default function Settings() {
             {/* Main Content */}
             <main className="max-w-5xl mx-auto px-8 py-16 relative z-10">
                 <header className="mb-16 animate-fadeIn">
-                    <h1 className="text-5xl font-black mb-4 tracking-tighter text-gemini">{t.settings.title}</h1>
+                    <h1 className="text-5xl font-black mb-4 tracking-tighter text-gemini">{t.settings?.title || 'Settings'}</h1>
                     <p className="text-muted-foreground text-lg font-bold leading-relaxed">
-                        {t.settings.desc}
+                        {t.settings?.desc || 'Customize your AI news experience'}
                     </p>
                 </header>
 
@@ -145,9 +154,9 @@ export default function Settings() {
                                 <Sparkles className="w-7 h-7" />
                             </div>
                             <div>
-                                <h2 className="text-2xl font-black tracking-tight">{t.settings.focusKeywords}</h2>
+                                <h2 className="text-2xl font-black tracking-tight">{t.settings?.focusKeywords || 'Focus Keywords'}</h2>
                                 <p className="text-muted-foreground text-sm font-bold">
-                                    {t.settings.keywordsDesc}
+                                    {t.settings?.keywordsDesc || 'AI analysis will prioritize these topics'}
                                 </p>
                             </div>
                         </div>
@@ -159,7 +168,7 @@ export default function Settings() {
                                 value={newKeyword}
                                 onChange={(e) => setNewKeyword(e.target.value)}
                                 onKeyPress={(e) => e.key === 'Enter' && addKeyword()}
-                                placeholder={t.settings.keywordPlaceholder}
+                                placeholder={t.settings?.keywordPlaceholder || 'Enter keyword (e.g. LLM, GPT-5)'}
                                 className="flex-1 px-8 py-5 glass border border-border focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-foreground placeholder-muted-foreground font-bold"
                             />
                             <button
@@ -167,7 +176,7 @@ export default function Settings() {
                                 className="px-10 py-5 bg-foreground text-background dark:bg-foreground dark:text-background font-black rounded-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 group shadow-xl"
                             >
                                 <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-                                {t.common.add}
+                                {t.common?.add || 'Add'}
                             </button>
                         </div>
 
@@ -192,7 +201,7 @@ export default function Settings() {
                         ) : (
                             <div className="text-center py-20 rounded-[2rem] border-2 border-dashed border-border bg-muted/20">
                                 <Sparkles className="w-10 h-10 mx-auto mb-4 text-muted-foreground opacity-30" />
-                                <p className="text-muted-foreground font-black">{t.settings.noKeywords}</p>
+                                <p className="text-muted-foreground font-black">{t.settings?.noKeywords || 'No keywords defined'}</p>
                             </div>
                         )}
                     </section>
@@ -204,9 +213,9 @@ export default function Settings() {
                                 <Rss className="w-7 h-7" />
                             </div>
                             <div>
-                                <h2 className="text-2xl font-black tracking-tight">{t.settings.curatedSources}</h2>
+                                <h2 className="text-2xl font-black tracking-tight">{t.settings?.curatedSources || 'Curated Sources'}</h2>
                                 <p className="text-muted-foreground text-sm font-bold">
-                                    {t.settings.sourcesDesc}
+                                    {t.settings?.sourcesDesc || 'Manage your RSS feed collection'}
                                 </p>
                             </div>
                         </div>
@@ -217,14 +226,14 @@ export default function Settings() {
                                 type="text"
                                 value={newSourceName}
                                 onChange={(e) => setNewSourceName(e.target.value)}
-                                placeholder={t.settings.sourceName}
+                                placeholder={t.settings?.sourceName || 'Source Name'}
                                 className="flex-1 px-8 py-5 glass border border-border focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-all font-bold"
                             />
                             <input
                                 type="text"
                                 value={newSourceUrl}
                                 onChange={(e) => setNewSourceUrl(e.target.value)}
-                                placeholder={t.settings.sourceUrl}
+                                placeholder={t.settings?.sourceUrl || 'RSS/Feed URL'}
                                 className="flex-[2] px-8 py-5 glass border border-border focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-all font-bold"
                             />
                             <button
@@ -232,7 +241,7 @@ export default function Settings() {
                                 className="px-10 py-5 bg-purple-600 text-white font-black rounded-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 group shadow-xl shadow-purple-500/20"
                             >
                                 <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-                                {t.common.add}
+                                {t.common?.add || 'Add'}
                             </button>
                         </div>
 
@@ -258,7 +267,7 @@ export default function Settings() {
 
                             {sources.length === 0 && (
                                 <div className="col-span-full text-center py-10 text-muted-foreground font-bold italic">
-                                    {t.settings.defaultSources}
+                                    {t.settings?.defaultSources || 'Using default global sources'}
                                 </div>
                             )}
                         </div>
@@ -271,16 +280,16 @@ export default function Settings() {
                                 <Bell className="w-7 h-7" />
                             </div>
                             <div>
-                                <h2 className="text-2xl font-black tracking-tight">{t.settings.dailySummary}</h2>
+                                <h2 className="text-2xl font-black tracking-tight">{t.settings?.dailySummary || 'Daily Summary'}</h2>
                                 <p className="text-muted-foreground text-sm font-bold">
-                                    {t.settings.summaryDesc}
+                                    {t.settings?.summaryDesc || 'When should we send your AI digest?'}
                                 </p>
                             </div>
                         </div>
 
                         <div className="glass rounded-[2rem] p-10 border border-border">
                             <div className="flex items-center justify-between mb-12">
-                                <span className="text-lg font-black text-foreground">{t.settings.deliveryWindow}</span>
+                                <span className="text-lg font-black text-foreground">{t.settings?.deliveryWindow || 'Delivery Window'}</span>
                                 <div className="text-5xl font-black text-gemini">
                                     {notificationTime.toString().padStart(2, '0')}:00
                                 </div>
@@ -298,8 +307,8 @@ export default function Settings() {
                                 }}
                             />
                             <div className="flex justify-between mt-6 text-xs text-muted-foreground font-black tracking-widest uppercase">
-                                <span>{t.settings.midnight}</span>
-                                <span>{t.settings.noon}</span>
+                                <span>{t.settings?.midnight || 'Midnight'}</span>
+                                <span>{t.settings?.noon || 'Noon'}</span>
                                 <span>11:00 PM</span>
                             </div>
                         </div>
@@ -317,7 +326,7 @@ export default function Settings() {
                             ) : (
                                 <>
                                     <Save className="w-6 h-6" />
-                                    {t.settings.pushChanges}
+                                    {t.settings?.pushChanges || 'Push Changes'}
                                 </>
                             )}
                         </button>
@@ -325,12 +334,12 @@ export default function Settings() {
                             href="/dashboard"
                             className="px-10 py-6 glass border border-border rounded-[2.5rem] font-black text-xl hover:bg-muted transition-all active:scale-95"
                         >
-                            {t.settings.discardChanges}
+                            {t.settings?.discardChanges || 'Discard'}
                         </Link>
                     </div>
 
                     <p className="text-center text-muted-foreground text-sm font-bold animate-fadeIn delay-500">
-                        Settings are persisted locally in your browser workspace.
+                        Settings are synchronized with your cloud profile.
                     </p>
                 </div>
             </main>

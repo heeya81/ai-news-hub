@@ -30,7 +30,7 @@ export default function LandingPage() {
             <LanguageToggle />
             <ThemeToggle />
             <Link
-              href="/dashboard"
+              href="/auth"
               className="hidden sm:flex px-6 py-2.5 bg-foreground text-background dark:bg-foreground dark:text-background rounded-full font-black text-sm hover:scale-105 active:scale-95 transition-all shadow-xl"
             >
               {t.landing.login}
@@ -63,7 +63,7 @@ export default function LandingPage() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-fadeIn delay-300">
             <Link
-              href="/dashboard"
+              href="/auth"
               className="group px-10 py-5 bg-foreground text-background dark:bg-foreground dark:text-background rounded-full font-black text-lg hover:scale-105 active:scale-95 transition-all duration-300 flex items-center gap-3 shadow-2xl"
             >
               {t.landing.startButton}

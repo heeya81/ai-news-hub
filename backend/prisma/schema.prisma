@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  password      String
+  profile       Profile?
+  subscriptions Subscription[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Profile {
+  id               String   @id @default(uuid())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String   @unique
+  keywords         Json?    // String array as JSON: ["AI", "LLM"]
+  sources          Json?    // Array of objects as JSON: [{"name": "...", "url": "..."}]
+  notificationTime Int      @default(9)
+  lastNotifiedAt   DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Subscription {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  endpoint  String   @unique
+  keys      Json     // { "p256dh": "...", "auth": "..." }
+  createdAt DateTime @default(now())
+}

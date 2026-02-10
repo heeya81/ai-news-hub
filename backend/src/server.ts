@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import { fetchAINews, filterNewsByKeywords, getRecentNews, DEFAULT_NEWS_SOURCES } from './services/newsService.js';
 import type { NewsItem } from './services/newsService.js';
 import { analyzeNewsRelevance } from './services/aiService.js';
+import authRoutes from './routes/authRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 
 dotenv.config();
 
@@ -20,6 +22,9 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
+
 app.post('/api/news', async (req, res) => {
     try {
         let { keywords, sources, hours } = req.body;

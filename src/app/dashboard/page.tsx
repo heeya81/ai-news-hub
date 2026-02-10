@@ -1,91 +1,81 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Rss, Plus, Settings as SettingsIcon, ChevronRight, Home, Bell, Menu, Sparkles, RefreshCw } from 'lucide-react';
+import { Rss, Plus, Settings as SettingsIcon, ChevronRight, Menu, Sparkles, RefreshCw, LogOut } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { ko, enUS } from 'date-fns/locale';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { useLanguage } from '@/components/LanguageProvider';
 import { NewsItem } from '@/lib/types';
+import { newsApi, userApi } from '@/lib/api';
 
 export default function Dashboard() {
     const { t, language } = useLanguage();
+    const router = useRouter();
     const dateLocale = language === 'ko' ? ko : enUS;
 
     const [news, setNews] = useState<NewsItem[]>([]);
     const [keywords, setKeywords] = useState<string[]>([]);
+    const [sources, setSources] = useState<any[]>([]);
     const [totalFetchedCount, setTotalFetchedCount] = useState(0);
     const [activeSources, setActiveSources] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-
     useEffect(() => {
-        // Load keywords from localStorage
-        if (typeof window !== 'undefined') {
-            const savedKeywords = localStorage.getItem('ainews_keywords');
-            if (savedKeywords) {
-                try {
-                    setKeywords(JSON.parse(savedKeywords));
-                } catch (e) {
-                    setKeywords([]);
-                }
-            }
+        const token = localStorage.getItem('ainews_token');
+        if (!token) {
+            router.push('/auth');
+            return;
         }
+        initDashboard();
     }, []);
 
-    useEffect(() => {
-        loadNews();
-    }, [keywords]);
-
-    async function loadNews() {
+    async function initDashboard() {
         setLoading(true);
         try {
-            // Check for custom sources
-            let customSources = [];
-            if (typeof window !== 'undefined') {
-                const savedSources = localStorage.getItem('ainews_sources');
-                if (savedSources) {
-                    try {
-                        customSources = JSON.parse(savedSources);
-                    } catch (e) {
-                        // ignore
-                    }
-                }
+            // 1. Fetch User Profile
+            const profileData = await userApi.getProfile();
+            let currentKeywords = [];
+            let currentSources = [];
+
+            if (profileData.success && profileData.profile) {
+                currentKeywords = profileData.profile.keywords || [];
+                currentSources = profileData.profile.sources || [];
+                setKeywords(currentKeywords);
+                setSources(currentSources);
             }
 
-            // Call Backend API via POST
-            const response = await fetch(`${API_URL}/api/news`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sources: customSources.length > 0 ? customSources : null,
-                    keywords: keywords
-                }),
-            });
+            // 2. Load News with these preferences
+            await loadNews(currentKeywords, currentSources);
+        } catch (error) {
+            console.error('Initialization failed:', error);
+            // Fallback load
+            await loadNews([], []);
+        } finally {
+            setLoading(false);
+        }
+    }
 
-            const data = await response.json();
+    async function loadNews(k = keywords, s = sources) {
+        try {
+            const data = await newsApi.fetchNews({
+                sources: s.length > 0 ? s : null,
+                keywords: k
+            });
 
             if (data.success && data.news) {
                 setNews(data.news);
                 setTotalFetchedCount(data.totalFetched || data.news.length);
                 setActiveSources(data.sourcesFetched || []);
-            } else {
-                setNews([]);
-                setTotalFetchedCount(0);
-                setActiveSources([]);
             }
         } catch (error) {
-            console.error('Failed to load news from backend:', error);
-            setNews([]);
-            setTotalFetchedCount(0);
-            setActiveSources([]);
+            console.error('Failed to load news:', error);
         } finally {
-            setLoading(false);
             setIsRefreshing(false);
         }
     }
@@ -93,6 +83,12 @@ export default function Dashboard() {
     const handleRefresh = () => {
         setIsRefreshing(true);
         loadNews();
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem('ainews_token');
+        localStorage.removeItem('ainews_user');
+        router.push('/');
     };
 
     return (
@@ -111,22 +107,30 @@ export default function Dashboard() {
                 <nav className="flex-1 px-4 space-y-2">
                     <Link href="/dashboard" className="flex items-center gap-3 px-5 py-4 rounded-2xl bg-primary/10 text-primary border border-primary/10 group transition-all font-bold">
                         <Rss className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                        <span>{t.dashboard.newsStream}</span>
+                        <span>{t.dashboard?.newsStream || 'News Stream'}</span>
                     </Link>
                     <Link href="/settings" className="flex items-center gap-3 px-5 py-4 rounded-2xl text-muted-foreground hover:text-foreground hover:bg-muted transition-all group border border-transparent hover:border-border/50 font-bold">
                         <SettingsIcon className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-                        <span>{t.common.settings}</span>
+                        <span>{t.common?.settings || 'Settings'}</span>
                     </Link>
+                    <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all group border border-transparent font-bold"
+                    >
+                        <LogOut className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                        <span>{t.common?.logout || 'Logout'}</span>
+                    </button>
                 </nav>
 
                 <div className="p-8 border-t border-border/40">
                     <div className="bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-pink-500/5 rounded-[1.5rem] p-6 border border-border/50">
                         <div className="flex items-center gap-2 mb-3 text-primary">
+                            <input defaultChecked type="checkbox" className="hidden" />
                             <Sparkles className="w-4 h-4" />
                             <span className="text-sm font-black uppercase tracking-widest">Pro Tip</span>
                         </div>
                         <p className="text-xs text-muted-foreground leading-relaxed font-bold">
-                            {t.dashboard.proTip}
+                            {t.dashboard?.proTip || 'Add specific keywords for better AI analysis results.'}
                         </p>
                     </div>
                 </div>
@@ -146,12 +150,12 @@ export default function Dashboard() {
                         </button>
                         <div className="flex items-center gap-10 text-sm">
                             <div className="flex flex-col">
-                                <span className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mb-1">{t.dashboard.sourceChannels}</span>
+                                <span className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mb-1">{t.dashboard?.sourceChannels || 'Channels'}</span>
                                 <strong className="text-foreground text-xl font-black">{activeSources.length}</strong>
                             </div>
                             <div className="w-[1px] h-10 bg-border/50" />
                             <div className="flex flex-col">
-                                <span className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mb-1">{t.dashboard.tailoredNews}</span>
+                                <span className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mb-1">{t.dashboard?.tailoredNews || 'Curated'}</span>
                                 <strong className="text-primary text-xl font-black">{news.length}</strong>
                             </div>
                         </div>
@@ -162,7 +166,7 @@ export default function Dashboard() {
                         <ThemeToggle />
                         <Link href="/settings" className="px-6 py-3 bg-foreground text-background dark:bg-foreground dark:text-background rounded-full font-black text-sm hover:scale-105 transition-all shadow-xl flex items-center gap-2 active:scale-95">
                             <Plus className="w-4 h-4" />
-                            {t.dashboard.manageKeywords}
+                            {t.dashboard?.manageKeywords || 'Manage'}
                         </Link>
                     </div>
                 </div>
@@ -175,14 +179,14 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between mb-12 animate-fadeIn">
                             <h2 className="text-4xl font-black tracking-tighter flex items-center gap-4">
                                 <span className="w-3 h-12 bg-gradient-to-b from-blue-500 via-purple-500 to-pink-500 rounded-full" />
-                                <span className="text-gemini">{t.dashboard.title}</span>
+                                <span className="text-gemini">{t.dashboard?.title || 'Daily AI Digest'}</span>
                             </h2>
                             <div className="flex items-center gap-4">
                                 <button
                                     onClick={handleRefresh}
                                     disabled={isRefreshing}
                                     className={`p-3 bg-card border border-border/50 rounded-2xl text-muted-foreground hover:text-primary transition-all shadow-sm ${isRefreshing ? 'animate-spin text-primary' : ''}`}
-                                    title={t.dashboard.refresh}
+                                    title={t.dashboard?.refresh || 'Refresh'}
                                 >
                                     <RefreshCw className="w-5 h-5" />
                                 </button>
@@ -205,23 +209,23 @@ export default function Dashboard() {
                                     <Sparkles className="w-10 h-10 text-primary opacity-60" />
                                 </div>
                                 <h3 className="text-3xl font-black mb-4 tracking-tight">
-                                    {totalFetchedCount > 0 ? t.dashboard.noMatchesTitle : t.dashboard.noNewsTitle}
+                                    {totalFetchedCount > 0 ? t.dashboard?.noMatchesTitle || 'No matches found' : t.dashboard?.noNewsTitle || 'Feed is empty'}
                                 </h3>
                                 <p className="text-muted-foreground text-lg mb-12 max-w-sm text-center font-bold leading-relaxed">
                                     {totalFetchedCount > 0
-                                        ? t.dashboard.noMatchesDesc
-                                        : t.dashboard.noNewsDesc}
+                                        ? t.dashboard?.noMatchesDesc || 'Try adjusting your keywords.'
+                                        : t.dashboard?.noNewsDesc || 'Check your sources or try again later.'}
                                 </p>
                                 {totalFetchedCount > 0 && (
                                     <div className="flex items-center gap-6">
                                         <button
-                                            onClick={() => setKeywords([])}
+                                            onClick={() => { setKeywords([]); loadNews([], sources); }}
                                             className="px-8 py-4 glass border border-border/50 hover:bg-background rounded-2xl text-md font-black transition-all active:scale-95"
                                         >
-                                            {t.dashboard.showAllNews}
+                                            {t.dashboard?.showAllNews || 'Show All'}
                                         </button>
                                         <Link href="/settings" className="px-8 py-4 bg-primary text-white rounded-2xl text-md font-black hover:scale-105 transition-all glow-primary active:scale-95">
-                                            {t.dashboard.editKeywords}
+                                            {t.dashboard?.editKeywords || 'Edit Keywords'}
                                         </Link>
                                     </div>
                                 )}
@@ -230,7 +234,7 @@ export default function Dashboard() {
                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                                 {news.map((item, index) => (
                                     <div className={`animate-fadeIn delay-${(index % 6) * 100}`} key={`${item.link}-${index}`}>
-                                        <NewsCard item={item} locale={dateLocale} badgeText={t.dashboard.newBadge} readMoreText={t.dashboard.readStory} />
+                                        <NewsCard item={item} locale={dateLocale} badgeText={t.dashboard?.newBadge || 'NEW'} readMoreText={t.dashboard?.readStory || 'Read Story'} />
                                     </div>
                                 ))}
                             </div>
