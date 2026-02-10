@@ -6,8 +6,12 @@ import type { NewsItem } from './services/newsService.js';
 import { analyzeNewsRelevance } from './services/aiService.js';
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import { initScheduler } from './services/schedulerService.js';
 
 dotenv.config();
+
+// Initialize scheduler
+initScheduler();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
