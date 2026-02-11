@@ -28,11 +28,6 @@ export default function Dashboard() {
     const [sidebarOpen, setSidebarOpen] = useState(true);
 
     useEffect(() => {
-        const token = localStorage.getItem('ainews_token');
-        if (!token) {
-            router.push('/auth');
-            return;
-        }
         initDashboard();
     }, []);
 

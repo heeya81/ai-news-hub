@@ -26,11 +26,6 @@ export default function Settings() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const token = localStorage.getItem('ainews_token');
-        if (!token) {
-            router.push('/auth');
-            return;
-        }
         loadSettings();
     }, []);
 
@@ -102,8 +97,8 @@ export default function Settings() {
         }
     }
 
-    const handleLogout = () => {
-        authLogout();
+    const handleLogout = async () => {
+        await authLogout();
         toast.success(t.common?.logoutSuccess || 'Logged out successfully');
     };
 

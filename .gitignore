@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# local mysql data
+mysql_data/
+backend/mysql_data/
 # debug
 npm-debug.log*
 yarn-debug.log*

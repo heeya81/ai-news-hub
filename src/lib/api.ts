@@ -17,7 +17,7 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
     // Handle Token Refresh (401 Unauthorized)
     if (response.status === 401 && endpoint !== '/auth/login' && endpoint !== '/auth/refresh') {
         try {
-            const refreshRes = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+            const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -42,13 +42,18 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
         }
     }
 
-    const data = await response.json();
-
-    if (!response.ok) {
-        throw new Error(data.error || 'Something went wrong');
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || 'Something went wrong');
+        }
+        return data;
+    } else {
+        const text = await response.text();
+        console.error('API Error (Non-JSON response):', text.substring(0, 200)); // Log first 200 chars
+        throw new Error(`API returned non-JSON response: ${response.status} ${response.statusText}`);
     }
-
-    return data;
 }
 
 export const authApi = {
@@ -85,9 +90,9 @@ export const userApi = {
 
 export const newsApi = {
     fetchNews: (params: any) => {
-        const query = new URLSearchParams();
-        if (params.sources) query.append('sources', JSON.stringify(params.sources));
-        if (params.keywords) query.append('keywords', JSON.stringify(params.keywords));
-        return apiRequest(`/news?${query.toString()}`);
+        return apiRequest('/news', {
+            method: 'POST',
+            body: JSON.stringify(params)
+        });
     }
 };
