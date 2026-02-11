@@ -37,8 +37,23 @@ npm run dev   # http://localhost:5000
 
 ### 3. Frontend Setup
 ```bash
+cd frontend
 npm install
 npm run dev   # http://localhost:3000
+```
+
+### 4. Deployment
+Docker configuration files are located in the `deploy/` directory.
+```bash
+cd deploy
+docker-compose up -d
+```
+
+### 4. Deployment
+Docker configuration files are located in the `deploy/` directory.
+```bash
+cd deploy
+docker-compose up -d
 ```
 
 ## 📂 Environment Variables
